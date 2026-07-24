@@ -9,23 +9,24 @@ Last updated: 2026-07-24
 ---
 
 ## Summary of Completed Work
-1. **Live Test Execution**: Ran a live Hollow-to-Hollow LAN discovery test with `UdpPortRelay.ps1` running and configuration overlays deployed (Host on `14001`, Client on `14002`).
-2. **Observed Results**:
-   - Both game instances got stuck on the "refresh" (updating network settings) pages during search.
-   - Host's session was not discovered by the Client.
-   - Screen positioning failed to separate the windows onto different monitors (both started on the same monitor).
-   - Direct connection via direct IP (`open 127.0.0.1` / `JoinLocal`) remains fully functional.
-3. **Log Examination**:
-   - Host log reported a Garbage Collection crash on shutdown/error: `Critical: appError called: World GearStart.TheWorld not cleaned up by garbage collection!` due to transient scene references in `SystemLinkConsole`.
-   - Client log showed `LAN SEARCH COMPLETE: Success=True Results=0` but did not locate any sessions.
+1. **Config Verification**: Checked the deployed `GearEngine.ini` configurations on Host and Client live installations:
+   - Host: `LanAnnouncePort=14001`
+   - Client: `LanAnnouncePort=14002`
+2. **Log Grep Verification**:
+   - Host's `Launch.log` has NO matches for `beacon` or `Listening for lan beacon` or `14001`/`14002`. The host did not bind to any beacon port.
+   - Client's `Launch.log` bound initially to `14001` at startup and then correctly re-bound to `14002` during search: `DevOnline: Listening for lan beacon requestes on 14002`.
+3. **Mismatches Located**:
+   - Host's engine execution does not match its config because the LAN beacon was never initialized.
+   - Root Cause: `SystemLinkConsole.uc`'s `ShouldUseLocalHostStartBypass` gate checked `bLANSessionCreated` (which is only set when hosting starts from the LAN Browser scene, not the Party Lobby). Thus, the Host travel bypass was blocked, and it never initialized/advertised its LAN session.
 
 ---
 
 ## Proven Findings
-- Direct IP connection bypasses the search/discovery phase and works correctly.
-- Live UDP relay test was unsuccessful in establishing discovery between Host on `14001` and Client on `14002`.
+- Workspace-to-deployed configs are in 100% agreement.
+- Client engine runtime successfully binds to the configured port `14002` when search starts.
+- Host engine runtime never binds to the beacon port because the lobby bypass gate blocks travel/session creation for the party lobby host path.
 
 ---
 
 ## Next Recommended Step
-Address the GC memory leak in `SystemLinkConsole.uc` where `HookedPartyScene` prevents garbage collection of the `World` upon map transition/exit. Then inspect if game packet contents are rejected by the `0xF5` byte header.
+Modify the gate logic in `SystemLinkConsole.uc` to allow the Party Lobby host to bypass the offline session check even if a session is not yet created, or trigger LAN session creation directly upon matchmaking start from the Party Lobby.
