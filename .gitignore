@@ -16,3 +16,6 @@ Binaries/
 Script/
 Config/
 Reference/
+
+# Broker transient runtime files — never committed to public repo
+Broker/

@@ -23,7 +23,6 @@ var transient bool bLANBrowserSearchStarted;
 var transient bool bLANJoinObserverInstalled;
 var transient int LANBrowserSearchDelayFrames;
 var transient bool bLANPostTravelProbePending;
-var transient bool bAutoStartProcessed;
 var transient int LANPostTravelProbeFrames;
 
 
@@ -39,9 +38,18 @@ event PostRender_Console(Canvas Canvas)
     ProbePostTravelLANBeacon();
     InstallLANBrowserHook();
     StartPendingLANBrowserSearch();
-    AutoInitializeDirectListenHost();
     AutoInitializeClientSearch();
-    ProcessAutoStartMode();
+}
+
+
+/*
+ * Clear transient scene references on level transition to prevent GC leak crash.
+ */
+event NotifyLevelChange(string NewMapName, bool bWarmup)
+{
+    LogInternal("[SystemLinkMod] NotifyLevelChange to " $ NewMapName $ " - clearing scene references");
+    HookedPartyScene = None;
+    HookedLANScene = None;
 }
 
 
@@ -254,8 +262,9 @@ function InstallPartyLobbyHook()
     PartyScene.lstPartyOptions.OnListOptionSubmitted =
         OnPartyListValueSubmitted;
 
-    if (ShouldUseLocalHostStartBypass(PartyScene) &&
-        PartyScene.MatchmakeButton != None)
+    if (PartyScene.MatchmakeButton != None &&
+        (ShouldUseLocalHostStartBypass(PartyScene) ||
+         PartyScene.IsSystemLinkMatch()))
     {
         PartyScene.MatchmakeButton.OnClicked =
             OnLocalSystemLinkStartClicked;
@@ -303,6 +312,18 @@ function bool OnLocalSystemLinkStartClicked(
     int PlayerIndex
 )
 {
+    if (HookedPartyScene != None &&
+        HookedPartyScene.IsSystemLinkMatch() &&
+        !bLANSessionCreated)
+    {
+        LogInternal(
+            "[SystemLinkMod] Matchmake clicked on FELobby_Party: " $
+            "initiating LAN party creation"
+        );
+        CreateLocalSystemLinkParty();
+        return true;
+    }
+
     if (!ShouldUseLocalHostStartBypass(HookedPartyScene))
     {
         return false;
@@ -383,6 +404,9 @@ function OnLocalSystemLinkProfileWriteComplete(
         "gearstart?game=" $
         "SystemLinkMod.SystemLinkPreGameLobbyGame"
     );
+
+    HookedPartyScene = None;
+    HookedLANScene = None;
 }
 
 
@@ -595,80 +619,6 @@ function StartPendingLANBrowserSearch()
 
 
 /*
- * Automatically initialize the LAN subsystem and create the 'Game' session
- * if Hollow is launched directly into a listen server map.
- */
-function AutoInitializeDirectListenHost()
-{
-    local GearPartyGameSettings LANSettings;
-
-    if (bLANSessionCreated || bLANCreatePending)
-    {
-        return;
-    }
-
-    if (!EnsureLANSubsystem())
-    {
-        LogInternal("[SystemLinkMod] AUTO-HOST ERROR: EnsureLANSubsystem failed");
-        return;
-    }
-
-    LogInternal("[SystemLinkMod] AUTO-HOST: Initializing LAN host session from main menu...");
-
-    LANSettings = new class'GearGame.GearPartyGameSettings';
-    ConfigureLANSettings(LANSettings, None);
-    PendingLANSettings = LANSettings;
-
-    LANGameInterface.ClearCreateOnlineGameCompleteDelegate(OnAutoHostLANPartyCreated);
-    LANGameInterface.AddCreateOnlineGameCompleteDelegate(OnAutoHostLANPartyCreated);
-
-    bLANCreatePending = true;
-    bLANSessionCreated = false;
-
-    LogInternal(
-        "[SystemLinkMod] AUTO-HOST: Calling CreateOnlineGame"
-    );
-
-    if (!LANGameInterface.CreateOnlineGame(0, 'Game', LANSettings))
-    {
-        LANGameInterface.ClearCreateOnlineGameCompleteDelegate(OnAutoHostLANPartyCreated);
-        bLANCreatePending = false;
-        LogInternal("[SystemLinkMod] AUTO-HOST ERROR: CreateOnlineGame native call returned false");
-    }
-}
-
-
-/*
- * Callback for AutoInitializeDirectListenHost.
- * Starts the online session and performs ClientTravel to GearPartyGame.
- */
-function OnAutoHostLANPartyCreated(name SessionName, bool bWasSuccessful)
-{
-    local PlayerController PC;
-
-    bLANCreatePending = false;
-    bLANSessionCreated = bWasSuccessful;
-
-    LogInternal(
-        "[SystemLinkMod] AUTO-HOST CALLBACK: Session=" $ string(SessionName) $
-        " Success=" $ string(bWasSuccessful)
-    );
-
-    if (bWasSuccessful && LANGameInterface != None)
-    {
-        LANGameInterface.StartOnlineGame(SessionName);
-        LogInternal("[SystemLinkMod] AUTO-HOST SUCCESS: LAN Beacon active on port 14001! Traveling to Party Lobby...");
-
-        if (ConsoleTargetPlayer != None && ConsoleTargetPlayer.Actor != None)
-        {
-            PC = ConsoleTargetPlayer.Actor;
-            PC.ClientTravel("GearStart?listen?game=GearGameContent.GearPartyGame", TRAVEL_Absolute);
-        }
-    }
-}
-
-
-/*
  * Automatically initialize LAN search if the client is in the LAN browser scene.
  */
 function AutoInitializeClientSearch()
@@ -701,52 +651,6 @@ function AutoInitializeClientSearch()
         bLANBrowserSearchRequested = true;
         LANBrowserSearchDelayFrames = 1;
         LogInternal("[SystemLinkMod] AUTO-SEARCH: LAN browser active; requested automatic search");
-    }
-}
-
-
-/*
- * Process configured AutoStartMode ('Host' or 'Client') directly from config.
- */
-function ProcessAutoStartMode()
-{
-    local SystemLinkLANGameInterface ModInterface;
-
-    if (bAutoStartProcessed)
-    {
-        return;
-    }
-
-    if (!EnsureLANSubsystem())
-    {
-        return;
-    }
-
-    ModInterface = SystemLinkLANGameInterface(LANGameInterface);
-    if (ModInterface == None || ModInterface.AutoStartMode == "" || ModInterface.AutoStartMode ~= "None")
-    {
-        bAutoStartProcessed = true;
-        return;
-    }
-
-    if (ModInterface.AutoStartMode ~= "Host")
-    {
-        if (!bLANSessionCreated && !bLANCreatePending)
-        {
-            bAutoStartProcessed = true;
-            LogInternal("[SystemLinkMod] AUTO-START CONFIG: AutoStartMode=Host -> initializing host session");
-            AutoInitializeDirectListenHost();
-        }
-    }
-    else if (ModInterface.AutoStartMode ~= "Client")
-    {
-        if (!bLANBrowserSearchRequested && !bLANBrowserSearchStarted)
-        {
-            bAutoStartProcessed = true;
-            LogInternal("[SystemLinkMod] AUTO-START CONFIG: AutoStartMode=Client -> requesting LAN search");
-            bLANBrowserSearchRequested = true;
-            LANBrowserSearchDelayFrames = 2;
-        }
     }
 }
 
@@ -1500,6 +1404,9 @@ function OnRealLANPartyCreated(
         TravelURL,
         0
     );
+
+    HookedPartyScene = None;
+    HookedLANScene = None;
 }
 
 function ConfigureLANSettings(
@@ -1567,6 +1474,54 @@ function ConfigureLANSettings(
 }
 
 
+/*
+ * Console Exec Function: Triggers System Link party lobby creation.
+ */
+exec function HostParty()
+{
+    LogInternal("[SystemLinkMod] EXEC: HostParty called from console");
+    bLANCreatePending = false;
+    bLANSessionCreated = false;
+    PendingLANControllerId = 0;
+    CreateLocalSystemLinkParty();
+}
 
 
+/*
+ * Console Exec Function: Forces immediate LAN browser search sweep.
+ */
+exec function SearchLAN()
+{
+    LogInternal("[SystemLinkMod] EXEC: SearchLAN called from console");
+    bLANBrowserSearchRequested = true;
+    bLANBrowserSearchStarted = false;
+    LANBrowserSearchDelayFrames = 1;
+    StartPendingLANBrowserSearch();
+}
+
+
+/*
+ * Console Exec Function: Directly connects to local loopback host (127.0.0.1).
+ */
+exec function JoinLocal()
+{
+    LogInternal("[SystemLinkMod] EXEC: JoinLocal called from console - connecting to 127.0.0.1");
+    if (ConsoleTargetPlayer != None && ConsoleTargetPlayer.Actor != None)
+    {
+        ConsoleTargetPlayer.Actor.ConsoleCommand("open 127.0.0.1");
+    }
+}
+
+
+/*
+ * Console Exec Function: Connects to a target host IP address.
+ */
+exec function ConnectIP(string TargetIP)
+{
+    LogInternal("[SystemLinkMod] EXEC: ConnectIP called with IP: " $ TargetIP);
+    if (ConsoleTargetPlayer != None && ConsoleTargetPlayer.Actor != None)
+    {
+        ConsoleTargetPlayer.Actor.ConsoleCommand("open " $ TargetIP);
+    }
+}
 
