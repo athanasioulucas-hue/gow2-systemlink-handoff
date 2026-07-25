@@ -34,7 +34,7 @@ event PostRender_Console(Canvas Canvas)
 {
     super.PostRender_Console(Canvas);
 
-    ClearPendingKillSceneReferences();
+    ClearInactiveSceneReferences();
     InstallPartyLobbyHook();
     RepairLANPartyGameSettings();
     ProbePostTravelLANBeacon();
@@ -50,27 +50,28 @@ event PostRender_Console(Canvas Canvas)
  * always the root-reachable reference blocking GC on client connection
  * loss/travel-away - this mod owns no hook on the classes that trigger
  * that travel (PlayerController, GameUISceneClient), so there is no event
- * to catch reactively. IsPendingKill() is confirmed idiomatic UnrealScript
- * (used throughout the real devkit source, e.g. GearWeapon.uc, GearPC.uc)
- * for detecting an object marked for destruction before GC actually
- * collects it - checking it every frame here is the only option within
- * this mod's own compile scope, since the UI scene is normally marked
- * pending-kill during travel teardown before the World-level GC pass runs.
+ * to catch reactively. UIScene.IsSceneActive() ("wrapper for easily
+ * determining whether this scene is in the scene client's list of active
+ * scenes", per its own devkit doc comment) is the correct, confirmed-
+ * compilable per-instance staleness check for a UIScene-derived object -
+ * IsPendingKill() was considered first but is Actor/SequenceObject-only in
+ * the real source (declared in a C++ cpptext block on Actor specifically),
+ * and UIScene never extends Actor, so it would not have compiled here.
  */
-function ClearPendingKillSceneReferences()
+function ClearInactiveSceneReferences()
 {
-    if (HookedPartyScene != None && HookedPartyScene.IsPendingKill())
+    if (HookedPartyScene != None && !HookedPartyScene.IsSceneActive())
     {
         LogInternal(
-            "[SystemLinkMod] HookedPartyScene was pending-kill, clearing to prevent GC leak"
+            "[SystemLinkMod] HookedPartyScene no longer active, clearing to prevent GC leak"
         );
         HookedPartyScene = None;
     }
 
-    if (HookedLANScene != None && HookedLANScene.IsPendingKill())
+    if (HookedLANScene != None && !HookedLANScene.IsSceneActive())
     {
         LogInternal(
-            "[SystemLinkMod] HookedLANScene was pending-kill, clearing to prevent GC leak"
+            "[SystemLinkMod] HookedLANScene no longer active, clearing to prevent GC leak"
         );
         HookedLANScene = None;
     }
