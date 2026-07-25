@@ -27,6 +27,8 @@ A corrected fix along these lines has been written and is ready, but — same as
 
 No code changes this pass beyond the one described three paragraphs up — the rest was documentation, investigation, and verification, no compiling or running the game.
 
+**Small final housekeeping this stretch**: did one last structural sanity check on the file holding both pending fixes (balanced braces, no duplicate function names) - all clean. Also tried to answer one specific open question in the fallback-design notes using a technical approach that turned out not to work on this kind of file at all - recorded that so nobody re-tries the same dead end, without pretending it settled the question.
+
 ---
 
 ## Next Recommended Step
