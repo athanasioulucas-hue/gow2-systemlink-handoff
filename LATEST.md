@@ -38,11 +38,13 @@ No code changes this pass beyond the one described three paragraphs up — the r
 
 **Then found a precise, easy way to actually test the second pending fix.** The instructions for testing it had said something vague like "reproduce the scenario that caused it before." Went back and actually read what those past crash logs said happened right before each crash, instead of just the technical detail already extracted from them - and found something useful: half of those old crashes turn out to be a different, already-fixed cause entirely, and the other half all trace back to one specific, simple, real-world trigger. That means there's now a precise, two-step way to test this fix on return, instead of having to guess at how to reproduce it.
 
+**Then, applying that same "read the raw log, not just the summary" approach one more time, found a real risk worth flagging honestly before the first pending fix gets tested.** The current code fires three things back-to-back in the exact same instant - the operation this fix corrects, a second unrelated operation, and then an actual scene change - with no pause in between for the first operation to actually finish and report back. That's a believable second explanation for why it never reported back last time, separate from and in addition to the specific mistake already fixed. Deliberately did not change this now, so the upcoming test cleanly shows whether the already-planned fix was enough on its own. If it isn't, the fix for this second issue is already worked out and ready to go, not something to figure out from scratch.
+
 ---
 
 ## Next Recommended Step
 On return, one compile now covers both pending fixes. Compile, deploy, and test both live:
-1. The original planned fix - using the test procedure document as a guide.
+1. The original planned fix - using the test procedure document as a guide. Watch closely for whether the operation actually reports back success this time - if the identifier is confirmed fixed but it still doesn't report back, that points to the second, already-analyzed issue described above.
 2. This session's new candidate fix for the second crash - join the joining player into the party lobby, then have the hosting player leave the party or close their game while the joining player stays put. That's the exact real-world trigger found in the historical logs for this crash, confirmed clean and reproducible.
 
 The separately-found dormant crash bug from earlier needs no action — it's documented as a known issue, not a blocker.
