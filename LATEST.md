@@ -4,18 +4,14 @@ Last updated: 2026-07-25
 ---
 
 ## Active Branch
-`agent/claude/fix-createparty-button-disabled-during-search` (private repo; not yet merged to `main`)
+`agent/claude/try-registerplayer-beacon-experiment` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. Confirmed the create-party button fix works live.
-2. Captured and fully decoded real network packet bytes for the first time — cross-referenced against the game's own logs and confirmed the discovery query packet is completely well-formed, ruling out a whole category of possible causes.
-3. Found no evidence a genuine reply has ever been sent by either instance — all captured traffic appears to be outbound queries only.
-4. Found a new correlating clue: the lobby screen shows players as permanently "connecting" instead of fully joined, even though the underlying network connection succeeds — likely because a session-registration step is never called.
-5. Investigated and resolved a question about whether this build's separate, already-working online multiplayer system (unrelated to System Link) could help — confirmed it's deliberately out of scope, since the actual goal requires real Xbox 360 System Link compatibility, which only the harder native path can provide. This reasoning was missing from the project's documentation and has now been recorded permanently.
+Implemented and deployed the one specific untested lead identified last session: a session-registration call that was declared in the game's networking interface but never actually used anywhere in this mod. Added it in the right place, made sure to properly wait for its result this time instead of assuming it completes instantly, and added logging so the next live test will show directly whether it changes anything. Compiled clean and deployed to both instances. Not yet tested live — that's the immediate next step.
 
 ---
 
 ## Next Recommended Step
-Awaiting a decision on the next technical direction: try the one specific untested lead found this session (a session-registration call that's declared but never used), or consider building a custom discovery mechanism that sidesteps the native black-box entirely, now that the exact wire format needed is fully known.
+Live test: host a party the normal way, check the host's log for the new registration-result line, then have the client search and report whether the host now appears. If this doesn't work, the agreed fallback is a bigger effort — building a custom discovery mechanism from scratch that doesn't depend on the game's native (and still partly unexplainable) networking code at all, now that the exact data format needed is fully understood from this session's packet analysis.
