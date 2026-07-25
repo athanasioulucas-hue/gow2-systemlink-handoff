@@ -4,16 +4,17 @@ Last updated: 2026-07-25
 ---
 
 ## Active Branch
-`agent/claude/launcher-positioning-and-test-cockpit` (private repo; not yet merged to `main`)
+`agent/claude/fix-notifylevelchange-signature-regression` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. User confirmed the test cockpit's 2x2 pane layout now works correctly after the earlier quoting fix.
-2. First live test of the dual-instance launcher: window-positioning fix confirmed working. Found a new bug — the second (Client) instance's launcher window didn't auto-confirm, needing manual intervention, due to a blind timing assumption and a silently-discarded activation call that degrades once the first instance's game is already running.
-3. Fixed by waiting for the launcher's real window handle and using a more reliable Windows API call to bring it to the foreground before sending keystrokes. Verified against a deliberately reproduced version of the failure (focus contention) using a harmless stand-in application — not yet re-tested against the real game.
+1. **Live test crashed both instances.** After a successful direct-IP join, clicking "Start Match" crashed both Host and Client with a fatal `World not cleaned up by garbage collection` error.
+2. **Root cause found**: an earlier commit, despite being labeled as a documentation-only change, had silently changed the signature of an UnrealScript event responsible for clearing stale scene references during level transitions. A signature mismatch means an event override is never actually called by the engine — it compiled without any error, but simply stopped firing. Confirmed by grepping session logs: zero occurrences of that event's log line across roughly ten level transitions.
+3. **Fixed**: reverted the signature to match the originally-working version exactly. Compiled clean, deployed and hash-verified to both Host and Client. Not yet tested live.
+4. **Also confirmed**: LAN discovery (host/search) still returns zero results on both instances even with the earlier relay fix in place — that part of the project remains unresolved and needs fresh investigation.
 
 ---
 
 ## Next Recommended Step
-User re-runs the dual-instance launcher to confirm both instances now auto-confirm and position correctly with no manual steps. If clean, proceed to the actual Phase 1C live test (relay + dual launch + in-game host/search) and report whether the client's browser list shows the host's session.
+Live test: relay running, dual launch, direct-IP join, Host clicks Start Match, confirm no crash on either side and that the level-transition log line now actually appears. If clean, shift focus to LAN discovery, which is now the main remaining blocker for Phase 1C.
