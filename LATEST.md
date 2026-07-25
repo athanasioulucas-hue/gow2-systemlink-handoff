@@ -23,7 +23,9 @@ A corrected fix along these lines has been written and is ready, but — same as
 
 **Then, gave the other pending fix (from before this stretch of work began) the same scrutiny that had just caught the mistake above.** Checked every piece of it against the real original source directly rather than assuming it was fine because it looked reasonable. Everything checked out clean this time — no changes needed, just added a note recording that it was specifically double-checked, so it's clear on return that both pending fixes have now gotten this same level of scrutiny, not just one of them.
 
-No code changes this pass beyond the one described two paragraphs up — the rest was documentation, investigation, and verification, no compiling or running the game.
+**Then did one more thoroughness pass**: swept every distinct error type across every historical log on both machine roles, specifically looking for a third undiscovered crash beyond the two already found. Found none - confirms nothing else is hiding in the historical record. Turned up one minor, inconclusive observation along the way (a UI warning that repeats in a small minority of past sessions, possibly mildly related to the same stuck-connection problem, but too inconsistent to call a real lead) - noted for the next test, not treated as a discovery.
+
+No code changes this pass beyond the one described three paragraphs up — the rest was documentation, investigation, and verification, no compiling or running the game.
 
 ---
 
