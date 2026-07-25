@@ -34,6 +34,8 @@ No code changes this pass beyond the one described three paragraphs up — the r
 
 **Small final housekeeping this stretch**: did one last structural sanity check on the file holding both pending fixes (balanced braces, no duplicate function names) - all clean. Also tried to answer one specific open question in the fallback-design notes using a technical approach that turned out not to work on this kind of file at all - recorded that so nobody re-tries the same dead end, without pretending it settled the question.
 
+**Then wrote down the lessons so they don't have to be relearned.** Several specific, non-obvious mistakes cost real time this session (trusting a commit message that didn't match its actual change, assuming a technique that worked in one place would work in another without checking first). Recorded each one plainly in the project's own operating-rules document so any future session - human or AI - starts already knowing about them, rather than rediscovering them the hard way again.
+
 ---
 
 ## Next Recommended Step
