@@ -4,20 +4,19 @@ Last updated: 2026-07-24
 ---
 
 ## Active Branch
-`agent/claude/fix-udp-relay-marker-corruption` (private repo; not yet merged to `main`)
+`agent/claude/launcher-positioning-and-test-cockpit` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. **Verified prior session's fixes are actually deployed** (not just documented):
-   - Both the state-gating fix (Party Lobby hosting now sets up a real LAN session) and the GC/travel-crash fix (`NotifyLevelChange` clears transient scene references) live in one commit and are compiled into the build currently deployed to both Host and Client — confirmed by hashing the live packages directly rather than trusting docs.
-2. **Found and fixed a UDP relay bug**:
-   - `tools/diagnostics/UdpPortRelay.ps1` was prepending a loop-guard marker byte to every packet it forwarded to the real destination port, and never stripping it before delivery — meaning the game engine's socket received every relayed LAN-beacon packet with one extra corrupting byte on the front.
-   - This is a plausible root cause for the client's `Results=0` discovery failure, separate from the (already-fixed) port-binding issue.
-   - Fixed: loop prevention now relies only on the pre-existing, non-destructive source-port check. Verified standalone (no game) that packets now relay byte-for-byte unmodified.
-   - **Not yet tested against the real game** — that requires a live dual-instance test.
+1. **Verified prior session's fixes are actually deployed** (state-gating fix + GC/travel-crash fix), and fixed a UDP relay bug that was corrupting every relayed LAN-beacon packet (see previous handoff entry for details).
+2. **Root-caused and fixed the "both instances launch on the same monitor" bug**:
+   - The launcher read a Windows API window handle without ever refreshing it, so it always read as empty and window positioning silently never ran.
+   - Verified the fix mechanism with a harmless stand-in application (Notepad) before touching the real game — confirmed working.
+3. **Added a test cockpit tool**: a single Windows Terminal window laid out in 4 panes (relay output, Host log, Client log, launcher shell) so a live test session doesn't require juggling separate windows. Windows Terminal wasn't installed on the test machine yet, so this specific tool is unverified pending that install.
+4. Fixed several stale/missing entries in the project's directory index doc.
 
 ---
 
 ## Next Recommended Step
-Run a live dual-instance test (Host + Client + fixed relay) and capture Host/Client `Launch.log` plus relay console output to determine whether the client's server browser now lists the host's session. This is the next attempt at passing the Phase 1C gate (Hollow-to-Hollow LAN discovery).
+User is installing Windows Terminal and fixing a local PowerShell execution-policy setting that was blocking all local scripts from running (unrelated to any code in this project). Once both are done: run the test cockpit, confirm the pane layout works, then re-attempt the Phase 1C live test (relay + dual launch + in-game host/search) and check whether windows land on the correct monitors and whether the client's browser list now shows the host's session.
