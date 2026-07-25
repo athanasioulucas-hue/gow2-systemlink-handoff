@@ -1,5 +1,5 @@
 # LATEST.md — Latest Session Handoff
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ---
 
@@ -9,14 +9,11 @@ Last updated: 2026-07-24
 ---
 
 ## Summary of Completed Work
-1. **Verified prior session's fixes are actually deployed** (state-gating fix + GC/travel-crash fix), and fixed a UDP relay bug that was corrupting every relayed LAN-beacon packet (see previous handoff entry for details).
-2. **Root-caused and fixed the "both instances launch on the same monitor" bug**:
-   - The launcher read a Windows API window handle without ever refreshing it, so it always read as empty and window positioning silently never ran.
-   - Verified the fix mechanism with a harmless stand-in application (Notepad) before touching the real game — confirmed working.
-3. **Added a test cockpit tool**: a single Windows Terminal window laid out in 4 panes (relay output, Host log, Client log, launcher shell) so a live test session doesn't require juggling separate windows. Windows Terminal wasn't installed on the test machine yet, so this specific tool is unverified pending that install.
-4. Fixed several stale/missing entries in the project's directory index doc.
+1. User's first live attempt at the new test cockpit tool failed: 4 tabs instead of a 2x2 pane layout, every pane erroring.
+2. Root cause: a nested command-quoting bug in how the cockpit script assembled Windows Terminal's command line (a string wrapped in another string, corrupting quote boundaries).
+3. Fixed by replacing inline command strings with plain script files. Verified via static syntax check (all clean) and a background smoke test confirming real log content streams correctly — but the actual Windows Terminal pane-splitting behavior still needs one more live attempt by the user to confirm the fix fully worked.
 
 ---
 
 ## Next Recommended Step
-User is installing Windows Terminal and fixing a local PowerShell execution-policy setting that was blocking all local scripts from running (unrelated to any code in this project). Once both are done: run the test cockpit, confirm the pane layout works, then re-attempt the Phase 1C live test (relay + dual launch + in-game host/search) and check whether windows land on the correct monitors and whether the client's browser list now shows the host's session.
+User re-runs the test cockpit script. If the 2x2 pane layout now works, proceed to the original Phase 1C live test: relay running, dual instance launch, in-game host/search console commands, then report whether windows land on correct monitors and whether the client's browser list shows the host's session.
