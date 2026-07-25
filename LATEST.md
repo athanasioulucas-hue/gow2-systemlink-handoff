@@ -9,12 +9,13 @@ Last updated: 2026-07-25
 ---
 
 ## Summary of Completed Work
-1. Major discovery: found that this build actually ships with real exported source code for the base game engine and full game (not just the mod), left over from earlier work and never noticed before. Recorded its location permanently for all future sessions.
-2. Used it to definitively confirm one earlier fix was chasing something that was never real in the first place (not a bug introduced this session — it never worked, ever).
-3. Used it to find and fix the actual cause of "have to spam the confirm button to host a lobby" — a UI element was being disabled during an unrelated background process, silently swallowing input.
-4. The core mystery — why hosted games still aren't found by search — remains unresolved. Real engine source only goes so far; the actual native code logic isn't included, only its outward interface. Raw network packet inspection is still the most promising next step.
+1. Confirmed the create-party button fix works live.
+2. Captured and fully decoded real network packet bytes for the first time — cross-referenced against the game's own logs and confirmed the discovery query packet is completely well-formed, ruling out a whole category of possible causes.
+3. Found no evidence a genuine reply has ever been sent by either instance — all captured traffic appears to be outbound queries only.
+4. Found a new correlating clue: the lobby screen shows players as permanently "connecting" instead of fully joined, even though the underlying network connection succeeds — likely because a session-registration step is never called.
+5. Investigated and resolved a question about whether this build's separate, already-working online multiplayer system (unrelated to System Link) could help — confirmed it's deliberately out of scope, since the actual goal requires real Xbox 360 System Link compatibility, which only the harder native path can provide. This reasoning was missing from the project's documentation and has now been recorded permanently.
 
 ---
 
 ## Next Recommended Step
-Live retest to confirm the button fix works (should respond immediately now, no repeated presses needed), then run the discovery test with the enhanced packet-logging relay actually watched, to see real network bytes instead of relying on inference from game logs.
+Awaiting a decision on the next technical direction: try the one specific untested lead found this session (a session-registration call that's declared but never used), or consider building a custom discovery mechanism that sidesteps the native black-box entirely, now that the exact wire format needed is fully known.
