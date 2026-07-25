@@ -8,6 +8,11 @@ Last updated: 2026-07-25
 
 ---
 
+## Quick Summary (read this first)
+The detailed account below is long - here's the short version. While the user was away, this session did documentation cleanup, then found and properly investigated two real bugs using historical log evidence instead of guessing, corrected a mistake in its own proposed fix before presenting it as ready, and double-checked everything else the same way. Two small, independent, ready-to-test fixes are now waiting on one compile - nothing else needs the user's attention until that happens. No live testing or compiling was done this pass; that all requires the user present.
+
+---
+
 ## Summary of Completed Work (autonomous session, continuing)
 Cleaned up two pieces of project documentation that had gone stale or were never filled in, despite being actively useful:
 1. The network findings document was nearly a week old and still listed open questions that this session's work had already answered — updated it with a clear current-state summary while keeping the old version visible for reference.
