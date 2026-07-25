@@ -4,17 +4,17 @@ Last updated: 2026-07-25
 ---
 
 ## Active Branch
-`agent/claude/fix-lan-browser-autosearch-loop` (private repo; not yet merged to `main`)
+`agent/claude/fix-missing-startonlinegame-beacon-arm` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. Live testing surfaced a usability regression: the LAN Browser menu chimed continuously with no stable window to interact with it, and the manual search command appeared to do nothing.
-2. Root cause: the automatic search-on-open feature was re-triggering itself every single frame after each search completed, instead of firing once. Fixed — it now fires exactly once per visit to that menu.
-3. **Major finding for the core discovery problem**: while that loop was active, watched the relay's live output during an actual game session for the first time (previously only tested standalone) and confirmed real traffic crossing in both directions. This rules out two prior theories about why discovery fails and narrows the problem to somewhere past basic network transport — likely how the receiving instance validates or correlates a reply, not confirmed yet.
-4. New build compiled clean, deployed and verified to both instances. Not yet tested live.
+1. With the auto-search loop fixed, retested cleanly: a real hosted party was still not discoverable by search, but joining that same party directly by IP worked fine — narrowing the problem specifically to beacon broadcast discovery.
+2. Found a diagnostic log line already built into the mod showing the host's network beacon stayed in a "not using beacon" state for ten seconds after hosting a party — and recognized this exact anomaly had been noted, unexplained, since the very first day of this project.
+3. Traced it to a missing function call: the code path used when actually hosting a party (via the normal menu flow) created the game session but never told it to start broadcasting for discovery — a separate call that a different, less-used code path already made correctly.
+4. Fixed by adding the missing call. Compiled clean, deployed and hash-verified to both instances. This is currently the leading candidate for actually resolving the LAN discovery problem that has blocked this phase of the project since the beginning.
 
 ---
 
 ## Next Recommended Step
-Retest LAN discovery now that the menu no longer loops — this should give one clean, isolated search attempt instead of continuous noise, making it much easier to tell what's actually happening. If it still fails with confirmed relay traffic, the next step is likely a raw network packet capture to see exactly what's being sent and rejected.
+Fresh dual launch, host a party through the normal menu flow, and check whether the client's search now finds it. If it does, this phase's core gate (LAN discovery) is passed and the project can move to the next phase (joining/lobby flow validation).
