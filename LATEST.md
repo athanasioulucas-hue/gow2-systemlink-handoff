@@ -9,9 +9,11 @@ Last updated: 2026-07-25
 ---
 
 ## Summary of Completed Work
-Implemented and deployed the one specific untested lead identified last session: a session-registration call that was declared in the game's networking interface but never actually used anywhere in this mod. Added it in the right place, made sure to properly wait for its result this time instead of assuming it completes instantly, and added logging so the next live test will show directly whether it changes anything. Compiled clean and deployed to both instances. Not yet tested live — that's the immediate next step.
+1. The first session-registration test showed no effect and — critically — its own completion signal never fired at all, unlike a previous test that at least completed and showed no change. Traced this precisely: the identifier being passed was almost certainly empty, because it was pulled from the wrong source. Corrected it to match the exact pattern used everywhere in the game's own real source code. **This fix is written and committed but not yet compiled or deployed** — that always needs the user present.
+2. Investigated the separate client-side crash (triggered by connection loss, not the button click already fixed) using the newly-found real source. Found genuine relevant engine hooks exist, but they all live on classes this mod can't safely modify — concluded honestly that there's no fix available here without bigger, riskier changes, rather than guessing.
+3. User asked for autonomous continuation while away (research/documentation only, nothing requiring the live game). Documented that all of this session's work branches form one clean linear stack rather than scattered parallel efforts, making eventual review straightforward.
 
 ---
 
 ## Next Recommended Step
-Live test: host a party the normal way, check the host's log for the new registration-result line, then have the client search and report whether the host now appears. If this doesn't work, the agreed fallback is a bigger effort — building a custom discovery mechanism from scratch that doesn't depend on the game's native (and still partly unexplainable) networking code at all, now that the exact data format needed is fully understood from this session's packet analysis.
+On return: compile the corrected fix (source already prepared), deploy, and test live — specifically checking whether the new diagnostic log finally confirms a non-empty player identifier and whether the completion signal fires this time. If this still doesn't resolve discovery, the already-agreed fallback is building a custom, from-scratch discovery mechanism that doesn't depend on the game's native networking code at all.
