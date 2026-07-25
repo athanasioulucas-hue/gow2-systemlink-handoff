@@ -9,11 +9,11 @@ Last updated: 2026-07-25
 ---
 
 ## Summary of Completed Work
-1. User's first live attempt at the new test cockpit tool failed: 4 tabs instead of a 2x2 pane layout, every pane erroring.
-2. Root cause: a nested command-quoting bug in how the cockpit script assembled Windows Terminal's command line (a string wrapped in another string, corrupting quote boundaries).
-3. Fixed by replacing inline command strings with plain script files. Verified via static syntax check (all clean) and a background smoke test confirming real log content streams correctly — but the actual Windows Terminal pane-splitting behavior still needs one more live attempt by the user to confirm the fix fully worked.
+1. User confirmed the test cockpit's 2x2 pane layout now works correctly after the earlier quoting fix.
+2. First live test of the dual-instance launcher: window-positioning fix confirmed working. Found a new bug — the second (Client) instance's launcher window didn't auto-confirm, needing manual intervention, due to a blind timing assumption and a silently-discarded activation call that degrades once the first instance's game is already running.
+3. Fixed by waiting for the launcher's real window handle and using a more reliable Windows API call to bring it to the foreground before sending keystrokes. Verified against a deliberately reproduced version of the failure (focus contention) using a harmless stand-in application — not yet re-tested against the real game.
 
 ---
 
 ## Next Recommended Step
-User re-runs the test cockpit script. If the 2x2 pane layout now works, proceed to the original Phase 1C live test: relay running, dual instance launch, in-game host/search console commands, then report whether windows land on correct monitors and whether the client's browser list shows the host's session.
+User re-runs the dual-instance launcher to confirm both instances now auto-confirm and position correctly with no manual steps. If clean, proceed to the actual Phase 1C live test (relay + dual launch + in-game host/search) and report whether the client's browser list shows the host's session.
