@@ -4,22 +4,20 @@ Last updated: 2026-07-24
 ---
 
 ## Active Branch
-`agent/antigravity/hollow-systemlink-harness`
+`agent/claude/fix-udp-relay-marker-corruption` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. **GC/Travel Crash Fix Verification**:
-   - ✅ SUCCESS. Both Host and Client processes exited cleanly with no GC leaks or crashes on map transitions or process shutdown (`Exit: Object subsystem successfully closed.`). Setting the transient references to `None` at travel-time resolved the memory leak crash successfully.
-2. **Hook Re-Attachment**:
-   - ✅ SUCCESS. Verified the hook re-attaches automatically when reloading the party lobby.
-3. **LAN Discovery Test Findings**:
-   - **Client Discovery**: ❌ FAILED. The client's search returned `Results=0` and did not list the Host's session.
-   - **UDP Port Relay Status**: ⚠️ Unconfirmed/Possibly broken. The user suspected the UDP port relay script was not relaying packets successfully.
-   - **Host LAN Beacon binding**: ✅ SUCCESS. Host log (`Gears of War 2 - Hollow\GearGame\Logs\Launch.log`) verified it successfully listens for LAN beacons: `DevOnline: Listening for lan beacon requestes on 14001`.
-   - **Client LAN Beacon search**: ✅ SUCCESS. Client log (`Gears of War 2 - Hollow - Client2\GearGame\Logs\Launch.log`) verified it successfully searches and listens: `DevOnline: Listening for lan beacon requestes on 14002`.
+1. **Verified prior session's fixes are actually deployed** (not just documented):
+   - Both the state-gating fix (Party Lobby hosting now sets up a real LAN session) and the GC/travel-crash fix (`NotifyLevelChange` clears transient scene references) live in one commit and are compiled into the build currently deployed to both Host and Client — confirmed by hashing the live packages directly rather than trusting docs.
+2. **Found and fixed a UDP relay bug**:
+   - `tools/diagnostics/UdpPortRelay.ps1` was prepending a loop-guard marker byte to every packet it forwarded to the real destination port, and never stripping it before delivery — meaning the game engine's socket received every relayed LAN-beacon packet with one extra corrupting byte on the front.
+   - This is a plausible root cause for the client's `Results=0` discovery failure, separate from the (already-fixed) port-binding issue.
+   - Fixed: loop prevention now relies only on the pre-existing, non-destructive source-port check. Verified standalone (no game) that packets now relay byte-for-byte unmodified.
+   - **Not yet tested against the real game** — that requires a live dual-instance test.
 
 ---
 
 ## Next Recommended Step
-The next session should inspect and debug `tools/diagnostics/UdpPortRelay.ps1` to ensure it is correctly forwarding bidirectional UDP broadcast packets between ports 14001 and 14002.
+Run a live dual-instance test (Host + Client + fixed relay) and capture Host/Client `Launch.log` plus relay console output to determine whether the client's server browser now lists the host's session. This is the next attempt at passing the Phase 1C gate (Hollow-to-Hollow LAN discovery).
