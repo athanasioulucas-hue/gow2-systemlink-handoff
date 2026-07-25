@@ -20,6 +20,7 @@ var transient bool bLANSessionCreated;
 var transient bool bLANPartySettingsRepairLogged;
 var transient bool bLANBrowserSearchRequested;
 var transient bool bLANBrowserSearchStarted;
+var transient bool bAutoSearchInitiatedForScene;
 var transient bool bLANJoinObserverInstalled;
 var transient int LANBrowserSearchDelayFrames;
 var transient bool bLANPostTravelProbePending;
@@ -33,12 +34,46 @@ event PostRender_Console(Canvas Canvas)
 {
     super.PostRender_Console(Canvas);
 
+    ClearPendingKillSceneReferences();
     InstallPartyLobbyHook();
     RepairLANPartyGameSettings();
     ProbePostTravelLANBeacon();
     InstallLANBrowserHook();
     StartPendingLANBrowserSearch();
     AutoInitializeClientSearch();
+}
+
+
+/*
+ * Client-side "World not cleaned up by garbage collection!" crash fix.
+ * Confirmed via 4 real historical crash logs that HookedPartyScene is
+ * always the root-reachable reference blocking GC on client connection
+ * loss/travel-away - this mod owns no hook on the classes that trigger
+ * that travel (PlayerController, GameUISceneClient), so there is no event
+ * to catch reactively. IsPendingKill() is confirmed idiomatic UnrealScript
+ * (used throughout the real devkit source, e.g. GearWeapon.uc, GearPC.uc)
+ * for detecting an object marked for destruction before GC actually
+ * collects it - checking it every frame here is the only option within
+ * this mod's own compile scope, since the UI scene is normally marked
+ * pending-kill during travel teardown before the World-level GC pass runs.
+ */
+function ClearPendingKillSceneReferences()
+{
+    if (HookedPartyScene != None && HookedPartyScene.IsPendingKill())
+    {
+        LogInternal(
+            "[SystemLinkMod] HookedPartyScene was pending-kill, clearing to prevent GC leak"
+        );
+        HookedPartyScene = None;
+    }
+
+    if (HookedLANScene != None && HookedLANScene.IsPendingKill())
+    {
+        LogInternal(
+            "[SystemLinkMod] HookedLANScene was pending-kill, clearing to prevent GC leak"
+        );
+        HookedLANScene = None;
+    }
 }
 
 
@@ -262,9 +297,19 @@ function InstallPartyLobbyHook()
     PartyScene.lstPartyOptions.OnListOptionSubmitted =
         OnPartyListValueSubmitted;
 
-    if (PartyScene.MatchmakeButton != None &&
-        (ShouldUseLocalHostStartBypass(PartyScene) ||
-         PartyScene.IsSystemLinkMatch()))
+    /*
+     * Hook unconditionally, not only for System Link / bypass-eligible
+     * parties. A plain direct-IP party (not created through this mod's
+     * own LAN flow) previously fell straight through to the native
+     * StartMatchButtonClicked with no hook attached at all, so this class
+     * never got a chance to clear HookedPartyScene before that native
+     * ServerTravel - which crashes with a GC-leak appError because the
+     * old world stays reachable through this class's own reference.
+     * OnLocalSystemLinkStartClicked always returns false for non-System-Link
+     * parties, so native handling proceeds exactly as before; only the
+     * bookkeeping clear is new.
+     */
+    if (PartyScene.MatchmakeButton != None)
     {
         PartyScene.MatchmakeButton.OnClicked =
             OnLocalSystemLinkStartClicked;
@@ -326,6 +371,21 @@ function bool OnLocalSystemLinkStartClicked(
 
     if (!ShouldUseLocalHostStartBypass(HookedPartyScene))
     {
+        /*
+         * Falling through to the native StartMatchButtonClicked, which
+         * ServerTravels synchronously - there is no later frame in which
+         * to clear these references before the GC-leak check runs, so
+         * clear them now, in the same call stack as the click itself.
+         */
+        LogInternal(
+            "[SystemLinkMod] Matchmake clicked - not a bypass-eligible " $
+            "System Link start; clearing scene references before " $
+            "native Start Match handling"
+        );
+
+        HookedPartyScene = None;
+        HookedLANScene = None;
+
         return false;
     }
 
@@ -453,6 +513,7 @@ function InstallLANBrowserHook()
         bLANHookLogged = false;
         bLANBrowserSearchRequested = false;
         bLANBrowserSearchStarted = false;
+        bAutoSearchInitiatedForScene = false;
         bLANJoinObserverInstalled = false;
         LANBrowserSearchDelayFrames = 0;
         return;
@@ -460,6 +521,28 @@ function InstallLANBrowserHook()
 
     LANScene.OnStartLANParty = CreateLocalSystemLinkParty;
     LANScene.OnCancelFromLANScene = CancelLocalSystemLinkBrowser;
+
+    /*
+     * GearUISceneFE_LAN.RefreshButtonBar() computes
+     * bEnableButtons = !bIsJoining && !bIsSearching and disables the
+     * CreateParty button (and its Y-press input) for the entire duration
+     * any search is in flight - including the automatic one-time search
+     * that now always fires on scene entry. Disabled buttons do not
+     * dispatch click events at all, so a Y press during that window is
+     * silently swallowed - this is the actual mechanism behind needing to
+     * repeatedly press Y to host a lobby. Force it enabled every frame
+     * this scene is active; hosting intent should not be gated on whether
+     * an unrelated background search happens to still be running.
+     */
+    if (LANScene.ButtonBar != None)
+    {
+        LANScene.ButtonBar.EnableButton(
+            'CreateParty',
+            LANScene.GetBestPlayerIndex(),
+            true,
+            false
+        );
+    }
 
     if (HookedLANScene != LANScene || !bLANHookLogged)
     {
@@ -619,14 +702,22 @@ function StartPendingLANBrowserSearch()
 
 
 /*
- * Automatically initialize LAN search if the client is in the LAN browser scene.
+ * Automatically initialize LAN search once when the client first enters the
+ * LAN browser scene. Gated on bAutoSearchInitiatedForScene (reset only when
+ * the scene actually closes, in InstallLANBrowserHook) rather than on
+ * bLANBrowserSearchStarted alone - that flag clears the instant a search
+ * completes, and completions can happen almost immediately when nothing is
+ * found, which re-armed this function every single frame and produced an
+ * uninterruptible auto-search loop (audible chime on every cycle, and no
+ * stable window for the player to press Y / Create Party).
  */
 function AutoInitializeClientSearch()
 {
     local GameUISceneClient SceneClient;
     local GearUISceneFE_LAN LANScene;
 
-    if (bLANSessionCreated || bLANCreatePending || bLANBrowserSearchStarted)
+    if (bLANSessionCreated || bLANCreatePending || bLANBrowserSearchStarted ||
+        bAutoSearchInitiatedForScene)
     {
         return;
     }
@@ -649,8 +740,9 @@ function AutoInitializeClientSearch()
     if (!bLANBrowserSearchRequested)
     {
         bLANBrowserSearchRequested = true;
+        bAutoSearchInitiatedForScene = true;
         LANBrowserSearchDelayFrames = 1;
-        LogInternal("[SystemLinkMod] AUTO-SEARCH: LAN browser active; requested automatic search");
+        LogInternal("[SystemLinkMod] AUTO-SEARCH: LAN browser active; requested one-time automatic search");
     }
 }
 
@@ -1287,6 +1379,8 @@ function OnRealLANPartyCreated(
     local int PlayerIndex;
     local string PlayerName;
     local string TravelURL;
+    local UniqueNetId LocalPlayerId;
+    local UniqueNetId ZeroUniqueId;
 
     if (LANGameInterface != None)
     {
@@ -1397,6 +1491,70 @@ function OnRealLANPartyCreated(
         TravelURL
     );
 
+    /*
+     * The engine's own base PlayerReplicationInfo.RegisterPlayerWithSession()
+     * (Engine\PlayerReplicationInfo.uc) normally does this automatically,
+     * triggered by replication of the PRI's UniqueId - but that fires once,
+     * early, tied to when the player's identity first replicates, which
+     * happens well before this mod creates the 'Game' session (only after
+     * the user navigates to System Link and presses Y). Its own gate
+     * (SessionName != 'None' && GetGameSettings(SessionName) != None) finds
+     * nothing at that early point and silently does nothing - nothing
+     * re-triggers it later once the session actually exists. GearPRI's own
+     * override even has a comment from the original Gears 2 developers
+     * calling this "a super, duper mega hack" for a related timing problem
+     * (JIP), confirming this registration path was already fragile
+     * upstream. Matches the exact pattern from GearPartyGame_Base.uc's own
+     * native call site: PC.PlayerReplicationInfo.UniqueId, not a generic
+     * profile-index lookup (which is what the previous attempt used, and
+     * likely why it produced a packet with an all-zero identifier instead
+     * of the player's real UniqueId). Registered as async and awaited via
+     * its own completion delegate rather than assumed synchronous - that
+     * was the mistake with the earlier StartOnlineGame attempt below,
+     * which checked BeaconState on the very next line instead of waiting
+     * for its own async completion.
+     */
+    if (LANGameInterface != None &&
+        LP.Actor.PlayerReplicationInfo != None)
+    {
+        LocalPlayerId = LP.Actor.PlayerReplicationInfo.UniqueId;
+
+        LANGameInterface.ClearRegisterPlayerCompleteDelegate(
+            OnLocalLANPlayerRegistered
+        );
+
+        LANGameInterface.AddRegisterPlayerCompleteDelegate(
+            OnLocalLANPlayerRegistered
+        );
+
+        LogInternal(
+            "[SystemLinkMod] LAN CREATE: Registering local player, " $
+            "PlayerIndex=" $ string(PlayerIndex) $
+            " HasNonZeroUniqueId=" $
+            string(LocalPlayerId != ZeroUniqueId)
+        );
+
+        LANGameInterface.RegisterPlayer('Game', LocalPlayerId, false);
+    }
+
+    /*
+     * CreateOnlineGame alone does not arm the LAN beacon - confirmed live,
+     * LanBeaconState stayed LANB_NotUsingLanBeacon for 600+ frames after a
+     * party created through this path (this matches the LANB_NotUsingLanBeacon
+     * anomaly already noted as historical evidence early in this project).
+     * The other party-creation path (OnLocalSystemLinkProfileWriteComplete)
+     * already calls this before its own travel; this path never did.
+     */
+    if (LANGameInterface != None)
+    {
+        LANGameInterface.StartOnlineGame('Game');
+
+        LogInternal(
+            "[SystemLinkMod] LAN CREATE: StartOnlineGame called, " $
+            "BeaconState=" $ string(LANGameInterface.LanBeaconState)
+        );
+    }
+
     bLANPostTravelProbePending = true;
     LANPostTravelProbeFrames = 0;
 
@@ -1408,6 +1566,30 @@ function OnRealLANPartyCreated(
     HookedPartyScene = None;
     HookedLANScene = None;
 }
+
+
+/*
+ * Completion callback for RegisterPlayer, called on the local host after
+ * creating a real LAN party. Logs BeaconState here, once this specific
+ * async operation has genuinely completed, rather than assuming it
+ * finishes synchronously.
+ */
+function OnLocalLANPlayerRegistered(name SessionName, bool bWasSuccessful)
+{
+    if (LANGameInterface != None)
+    {
+        LANGameInterface.ClearRegisterPlayerCompleteDelegate(
+            OnLocalLANPlayerRegistered
+        );
+
+        LogInternal(
+            "[SystemLinkMod] LAN CREATE: RegisterPlayer complete, " $
+            "Success=" $ string(bWasSuccessful) $
+            " BeaconState=" $ string(LANGameInterface.LanBeaconState)
+        );
+    }
+}
+
 
 function ConfigureLANSettings(
     GearPartyGameSettings LANSettings,
