@@ -9,12 +9,11 @@ Last updated: 2026-07-25
 ---
 
 ## Summary of Completed Work
-1. With the auto-search loop fixed, retested cleanly: a real hosted party was still not discoverable by search, but joining that same party directly by IP worked fine — narrowing the problem specifically to beacon broadcast discovery.
-2. Found a diagnostic log line already built into the mod showing the host's network beacon stayed in a "not using beacon" state for ten seconds after hosting a party — and recognized this exact anomaly had been noted, unexplained, since the very first day of this project.
-3. Traced it to a missing function call: the code path used when actually hosting a party (via the normal menu flow) created the game session but never told it to start broadcasting for discovery — a separate call that a different, less-used code path already made correctly.
-4. Fixed by adding the missing call. Compiled clean, deployed and hash-verified to both instances. This is currently the leading candidate for actually resolving the LAN discovery problem that has blocked this phase of the project since the beginning.
+1. Retested the previous fix live — it did not resolve discovery. Confirmed with a diagnostic log line specifically added to test it: the beacon state genuinely did not change, ruling out that hypothesis with hard evidence rather than assumption.
+2. Confirmed to the user (who asked directly) that every build this session has been compiled once and deployed identically to both game installations, verified every time — no mismatch between the two sides has ever occurred.
+3. Found an old diagnostic tool in the repo was stale and risky to use during a live test (it would compete with the actual game for the same network port). Instead enhanced the already-working relay tool to show the actual raw bytes of network traffic, which is a safer and more direct way to see what's really happening.
 
 ---
 
 ## Next Recommended Step
-Fresh dual launch, host a party through the normal menu flow, and check whether the client's search now finds it. If it does, this phase's core gate (LAN discovery) is passed and the project can move to the next phase (joining/lobby flow validation).
+Live retest with the enhanced relay running to capture actual raw packet bytes crossing between instances during a discovery attempt — this should reveal what the previous log-based investigation couldn't. Separately, investigate a usability complaint about needing to repeatedly press the confirm button to host a lobby, which needs more specific detail from the user before it can be diagnosed.
