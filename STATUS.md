@@ -109,6 +109,17 @@ Last updated: 2026-07-23
 - **Hook Re-Attachment**: 
   - Verified that `PostRender_Console` runs every frame and re-attaches `MatchmakeButton.OnClicked` to `OnLocalSystemLinkStartClicked` automatically for any new scene instance post-travel. No changes needed.
 
+---
+
+## Live Test Findings (2026-07-24)
+- **Client Discovery**: ❌ FAILED. The client's search returned `Results=0` and did not list the Host's session.
+- **UDP Port Relay Status**: ⚠️ Unconfirmed/Possibly broken. The user suspected the UDP port relay script was not relaying packets successfully.
+- **Host LAN Beacon binding**: ✅ SUCCESS. Host log (`Gears of War 2 - Hollow\GearGame\Logs\Launch.log`) verified it successfully listens for LAN beacons: `DevOnline: Listening for lan beacon requestes on 14001`.
+- **Client LAN Beacon search**: ✅ SUCCESS. Client log (`Gears of War 2 - Hollow - Client2\GearGame\Logs\Launch.log`) verified it successfully searches and listens: `DevOnline: Listening for lan beacon requestes on 14002`.
+- **GC/Travel Crash Fix Verification**: ✅ SUCCESS. Both Host and Client processes exited cleanly with no GC leaks or crashes on level transitions or process shutdown (`Exit: Object subsystem successfully closed.`).
+- **NotifyLevelChange Execution**: ⚠️ Unconfirmed in standard log files on direct close (game exit), but the travel-time explicit clearances resolved the GC crash successfully.
+
+
 
 
 
