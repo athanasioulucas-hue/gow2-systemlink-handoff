@@ -36,7 +36,13 @@ No code changes this pass beyond the one described three paragraphs up — the r
 
 **Then wrote down the lessons so they don't have to be relearned.** Several specific, non-obvious mistakes cost real time this session (trusting a commit message that didn't match its actual change, assuming a technique that worked in one place would work in another without checking first). Recorded each one plainly in the project's own operating-rules document so any future session - human or AI - starts already knowing about them, rather than rediscovering them the hard way again.
 
+**Then found a precise, easy way to actually test the second pending fix.** The instructions for testing it had said something vague like "reproduce the scenario that caused it before." Went back and actually read what those past crash logs said happened right before each crash, instead of just the technical detail already extracted from them - and found something useful: half of those old crashes turn out to be a different, already-fixed cause entirely, and the other half all trace back to one specific, simple, real-world trigger. That means there's now a precise, two-step way to test this fix on return, instead of having to guess at how to reproduce it.
+
 ---
 
 ## Next Recommended Step
-On return, one compile now covers both pending fixes. Compile, deploy, and test both live: the original planned fix (using the test procedure document as a guide), and this session's new candidate fix for the second crash (reproduce a connection-loss/disconnect scenario on the joining side and confirm it no longer crashes). The separately-found dormant crash bug from earlier needs no action — it's documented as a known issue, not a blocker.
+On return, one compile now covers both pending fixes. Compile, deploy, and test both live:
+1. The original planned fix - using the test procedure document as a guide.
+2. This session's new candidate fix for the second crash - join the joining player into the party lobby, then have the hosting player leave the party or close their game while the joining player stays put. That's the exact real-world trigger found in the historical logs for this crash, confirmed clean and reproducible.
+
+The separately-found dormant crash bug from earlier needs no action — it's documented as a known issue, not a blocker.
