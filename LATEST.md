@@ -4,17 +4,17 @@ Last updated: 2026-07-25
 ---
 
 ## Active Branch
-`agent/claude/fix-notifylevelchange-signature-regression` (private repo; not yet merged to `main`)
+`agent/claude/fix-lan-browser-autosearch-loop` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. First crash-fix attempt (signature revert) retested live — crash recurred identically, and the event still never fired even with a hash-verified correct deployment. That assumption was wrong.
-2. Found the real cause: the Party Lobby's Start Match button was only being redirected to this mod's own handler for parties created through its own LAN flow. A plain direct-IP join never satisfies that condition, so the mod never got a chance to clean up before the native game code traveled to a new map — causing the same fatal crash.
-3. Fixed by always intercepting that button click and cleaning up proactively before handing off to native behavior for any party the mod doesn't need to handle itself. Compiled clean, deployed and hash-verified to both instances. Explicitly scoped: this fixes the hosting side of the crash; a second, differently-triggered crash on the joining side (from connection loss rather than a button click) remains open.
-4. User redirected priority: the direct-IP testing was a useful diagnostic detour but isn't the actual goal — LAN discovery (the real System Link search/host flow) is, and it's still not working.
+1. Live testing surfaced a usability regression: the LAN Browser menu chimed continuously with no stable window to interact with it, and the manual search command appeared to do nothing.
+2. Root cause: the automatic search-on-open feature was re-triggering itself every single frame after each search completed, instead of firing once. Fixed — it now fires exactly once per visit to that menu.
+3. **Major finding for the core discovery problem**: while that loop was active, watched the relay's live output during an actual game session for the first time (previously only tested standalone) and confirmed real traffic crossing in both directions. This rules out two prior theories about why discovery fails and narrows the problem to somewhere past basic network transport — likely how the receiving instance validates or correlates a reply, not confirmed yet.
+4. New build compiled clean, deployed and verified to both instances. Not yet tested live.
 
 ---
 
 ## Next Recommended Step
-Shift focus to LAN discovery. Run a live host/search attempt while actually watching the relay's own console output in real time, to determine whether any traffic reaches the relay at all during a real attempt — this has only been inferred from a standalone (non-game) test so far, never directly observed live.
+Retest LAN discovery now that the menu no longer loops — this should give one clean, isolated search attempt instead of continuous noise, making it much easier to tell what's actually happening. If it still fails with confirmed relay traffic, the next step is likely a raw network packet capture to see exactly what's being sent and rejected.
