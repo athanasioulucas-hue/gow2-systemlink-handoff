@@ -4,16 +4,17 @@ Last updated: 2026-07-25
 ---
 
 ## Active Branch
-`agent/claude/fix-missing-startonlinegame-beacon-arm` (private repo; not yet merged to `main`)
+`agent/claude/fix-createparty-button-disabled-during-search` (private repo; not yet merged to `main`)
 
 ---
 
 ## Summary of Completed Work
-1. Retested the previous fix live — it did not resolve discovery. Confirmed with a diagnostic log line specifically added to test it: the beacon state genuinely did not change, ruling out that hypothesis with hard evidence rather than assumption.
-2. Confirmed to the user (who asked directly) that every build this session has been compiled once and deployed identically to both game installations, verified every time — no mismatch between the two sides has ever occurred.
-3. Found an old diagnostic tool in the repo was stale and risky to use during a live test (it would compete with the actual game for the same network port). Instead enhanced the already-working relay tool to show the actual raw bytes of network traffic, which is a safer and more direct way to see what's really happening.
+1. Major discovery: found that this build actually ships with real exported source code for the base game engine and full game (not just the mod), left over from earlier work and never noticed before. Recorded its location permanently for all future sessions.
+2. Used it to definitively confirm one earlier fix was chasing something that was never real in the first place (not a bug introduced this session — it never worked, ever).
+3. Used it to find and fix the actual cause of "have to spam the confirm button to host a lobby" — a UI element was being disabled during an unrelated background process, silently swallowing input.
+4. The core mystery — why hosted games still aren't found by search — remains unresolved. Real engine source only goes so far; the actual native code logic isn't included, only its outward interface. Raw network packet inspection is still the most promising next step.
 
 ---
 
 ## Next Recommended Step
-Live retest with the enhanced relay running to capture actual raw packet bytes crossing between instances during a discovery attempt — this should reveal what the previous log-based investigation couldn't. Separately, investigate a usability complaint about needing to repeatedly press the confirm button to host a lobby, which needs more specific detail from the user before it can be diagnosed.
+Live retest to confirm the button fix works (should respond immediately now, no repeated presses needed), then run the discovery test with the enhanced packet-logging relay actually watched, to see real network bytes instead of relying on inference from game logs.
